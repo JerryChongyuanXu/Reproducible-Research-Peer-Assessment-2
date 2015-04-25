@@ -1,0 +1,117 @@
+---
+title: 'Reproducible Research: Peer Assessment 2'
+author: "Chongyuan Xu"
+date: "April, 20th, 2015"
+output: html_document
+---
+
+# Impact of Health and Economic of Weather Events in USA
+
+## Synopsis
+
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern. This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage. In this assessment, I want to find which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health and which types of events have the greatest economic consequences. 
+
+## Data Processing
+
+Load the data
+
+```{r, echo = TRUE}
+data <- read.csv(bzfile("repdata-data-StormData.csv.bz2"), header = TRUE, stringsAsFactors = FALSE)
+head(data)
+names(data)
+```
+
+There are just 7 variables of the storm data needed in this analysis: 
+- EVTYPE: All the events listed.
+- FATALITIES: The number of people died during an event.
+- INJURIES: The number of people injured during an event.
+- PROPDMG: The amount of property damage.
+- PROPDMGEXP: the order of magnitudes of PROPDMG.
+- CROPDMG: the amount of crop damage.
+- CROPDMGEXP: the order of magnitudes of CROPDMG.
+
+We should calculate the total amount of property damage and crop damage in US dollars.
+
+```{r, echo = TRUE}
+unique(data$PROPDMGEXP)
+data$PROPDMGEXP <- as.character(data$PROPDMGEXP)
+data$PROPDMGEXP[which(data$PROPDMGEXP == "K")] <- 1e+03
+data$PROPDMGEXP[which(data$PROPDMGEXP == "M")] <- 1e+06
+data$PROPDMGEXP[which(data$PROPDMGEXP == "")] <- 1
+data$PROPDMGEXP[which(data$PROPDMGEXP == "B")] <- 1e+09
+data$PROPDMGEXP[which(data$PROPDMGEXP == "m")] <- 1e+06
+data$PROPDMGEXP[which(data$PROPDMGEXP == "+")] <- 0
+data$PROPDMGEXP[which(data$PROPDMGEXP == "0")] <- 1
+data$PROPDMGEXP[which(data$PROPDMGEXP == "5")] <- 1e+05
+data$PROPDMGEXP[which(data$PROPDMGEXP == "6")] <- 1e+06
+data$PROPDMGEXP[which(data$PROPDMGEXP == "?")] <- 0
+data$PROPDMGEXP[which(data$PROPDMGEXP == "4")] <- 1e+04
+data$PROPDMGEXP[which(data$PROPDMGEXP == "2")] <- 1e+02
+data$PROPDMGEXP[which(data$PROPDMGEXP == "3")] <- 1e+03
+data$PROPDMGEXP[which(data$PROPDMGEXP == "h")] <- 1e+02
+data$PROPDMGEXP[which(data$PROPDMGEXP == "7")] <- 1e+07
+data$PROPDMGEXP[which(data$PROPDMGEXP == "H")] <- 1e+02
+data$PROPDMGEXP[which(data$PROPDMGEXP == "-")] <- 0
+data$PROPDMGEXP[which(data$PROPDMGEXP == "1")] <- 10
+data$PROPDMGEXP[which(data$PROPDMGEXP == "8")] <- 1e+08
+data$PROPDMGAMOUNT <- data$PROPDMG * as.numeric(data$PROPDMGEXP)
+```
+
+```{r, echo = TRUE}
+unique(data$CROPDMGEXP)
+data$CROPDMGEXP <- as.character(data$CROPDMGEXP)
+data$CROPDMGEXP[which(data$CROPDMGEXP == "")] <- 1
+data$CROPDMGEXP[which(data$CROPDMGEXP == "M")] <- 1e+06
+data$CROPDMGEXP[which(data$CROPDMGEXP == "K")] <- 1e+03
+data$CROPDMGEXP[which(data$CROPDMGEXP == "m")] <- 1e+06
+data$CROPDMGEXP[which(data$CROPDMGEXP == "B")] <- 1e+09
+data$CROPDMGEXP[which(data$CROPDMGEXP == "?")] <- 0
+data$CROPDMGEXP[which(data$CROPDMGEXP == "0")] <- 1
+data$CROPDMGEXP[which(data$CROPDMGEXP == "k")] <- 1e+03
+data$CROPDMGEXP[which(data$CROPDMGEXP == "2")] <- 1e+02
+data$CROPDMGAMOUNT <- data$CROPDMG * as.numeric(data$CROPDMGEXP)
+```
+
+Then, we must calculate the sum of fatilities, injuries, proper damage amount and crop damage amount for each kind of event. 
+
+```{r, echo = TRUE}
+Fatalities <- aggregate(data$FATALITIES, by = list(data$EVTYPE), FUN = sum)
+names(Fatalities) <- c("EVTYPE", "FATALITIES")
+
+Injuries <- aggregate(data$INJURIES, by = list(data$EVTYPE), FUN = sum)
+names(Injuries) <- c("EVTYPE", "INJURIES")
+
+Propdmgamount <- aggregate(data$PROPDMGAMOUNT, by = list(data$EVTYPE), FUN = sum)
+names(Propdmgamount) <- c("EVTYPE", "PROPDMGAMOUNT")
+
+Cropdmgamount <- aggregate(data$CROPDMGAMOUNT, by = list(data$EVTYPE), FUN = sum)
+names(Cropdmgamount) <- c("EVTYPE", "CROPDMGAMOUNT")
+```
+
+## Results
+
+```{r, echo = TRUE}
+library(ggplot2)
+FatalitiesInjuries <- data.frame(Fatalities$EVTYPE, Fatalities$FATALITIES + Injuries$INJURIES)
+names(FatalitiesInjuries) <- c("EVTYPE", "FATALITIESINJURIES")
+FatalitiesInjuries <- FatalitiesInjuries[order(-FatalitiesInjuries$FATALITIESINJURIES)[1 : 10], ]
+
+par(mfrow = c(1, 1), mar = c(12, 5, 3, 2), mgp = c(3, 1, 0), cex = 0.6, las = 3)
+barplot(FatalitiesInjuries[, 2], names.arg = FatalitiesInjuries$EVTYPE, main = 'Top 10 Events for Fatalities and Injuries', ylab = "Sum of Fatalities and Injuries")
+```
+
+It is easily seen from the graph that the most harmful event respect to population health is tornado, which has much more fatalities and injuries than any other event. 
+
+```{r, echo = TRUE}
+Propdmgamount <- Propdmgamount[order(-Propdmgamount$PROPDMGAMOUNT)[1 : 10], ]
+
+par(mfrow = c(1, 1), mar = c(12, 5, 3, 2), mgp = c(3, 1, 0), cex = 0.6, las = 3)
+barplot(Propdmgamount[, 2], names.arg = Propdmgamount$EVTYPE, main = 'Top 10 Events for Property Consequences', ylab = "Sum of Property Damage")
+
+Cropdmgamount <- Cropdmgamount[order(-Cropdmgamount$CROPDMGAMOUNT)[1 : 10], ]
+
+par(mfrow = c(1, 1), mar = c(12, 5, 3, 2), mgp = c(3, 1, 0), cex = 0.6, las = 3)
+barplot(Cropdmgamount[, 2], names.arg = Cropdmgamount$EVTYPE, main = 'Top 10 Events for Crop Consequences', ylab = "Sum of Crop Damage")
+```
+
+We can find that flood, hurricane/typhoon and tornado are the events that mostly affect the property. Drought, flood and river flood are the events that mostly effect the crop. 
